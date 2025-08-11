@@ -12,11 +12,12 @@ stats = ['min', 'mean', 'max', 'std']
 stats_sum = ['min', 'mean', 'max', 'std', 'sum']
 
 # =============================================================================
-# prev
+# prev: 이전 거래(Previous Application) 데이터 집계 방식 정의
 # =============================================================================
 
 prev_num_aggregations = {
     # TODO: optimize stats
+    # 주요 금액, 기간, 비율 변수에 대해 min, mean, max, std 등 통계량 집계
     'AMT_ANNUITY': stats,
     'AMT_APPLICATION': stats,
     'AMT_CREDIT': stats,
@@ -242,10 +243,11 @@ prev_num_aggregations = {
  }
 
 # =============================================================================
-# POS
+# POS: POS_CASH_balance 데이터 집계 방식 정의
 # =============================================================================
 
 pos_num_aggregations = {
+    # 월별 잔고, 연체일수 등 주요 변수에 대해 통계량 집계
     # TODO: optimize stats
     'MONTHS_BALANCE': ['min', 'max', 'mean', 'size'],
     'SK_DPD': ['max', 'mean', 'std'],
@@ -271,10 +273,11 @@ pos_num_aggregations = {
 }
 
 # =============================================================================
-# ins
+# ins: 할부(Installments Payments) 데이터 집계 방식 정의
 # =============================================================================
 
 ins_num_aggregations = {
+    # 할부 버전, 지연/미납/지급 금액 등 다양한 변수에 대해 통계량 집계
     # TODO: optimize stats
     'NUM_INSTALMENT_VERSION': ['nunique'],
     
@@ -367,7 +370,7 @@ ins_num_aggregations = {
 
 
 # =============================================================================
-# cre
+# cre: 신용카드(Credit Card Balance) 데이터 집계 방식 정의
 # =============================================================================
 
 
@@ -614,9 +617,8 @@ cre_num_aggregations = {
  }
 
 # =============================================================================
-# 
+# bure: Bureau(외부 신용정보) 데이터 집계 방식 정의
 # =============================================================================
-
 
 bure_num_aggregations = {
         # TODO: optimize stats
@@ -762,11 +764,12 @@ bure_num_aggregations = {
 
 
 # =============================================================================
-# 
+# bb: Bureau Balance(외부 신용정보 월별 상태) 데이터 집계 방식 정의
 # =============================================================================
 
 bb_num_aggregations = {
-        'MONTHS_BALANCE': ['min', 'max', 'mean', 'sum', 'std', 'size'],
+    # 월별 상태, 연체 등 주요 변수에 대해 통계량 집계
+    'MONTHS_BALANCE': ['min', 'max', 'mean', 'sum', 'std', 'size'],
          'STATUS_0': stats, 
          'STATUS_1': stats, 
          'STATUS_2': stats,

@@ -116,23 +116,17 @@ from multiprocessing import cpu_count, Pool
 import gc
 
 # =============================================================================
-# global variables
+# 전역 변수 및 환경 설정
 # =============================================================================
 
-COMPETITION_NAME = 'home-credit-default-risk'
-
-SPLIT_SIZE = 20
-
-
-
-
-
-
+COMPETITION_NAME = 'home-credit-default-risk'  # 대회명
+SPLIT_SIZE = 20  # 데이터 분할 기본값
 
 # =============================================================================
-# def
+# 유틸리티 함수 정의
 # =============================================================================
 def start(fname):
+    """실행 시작 시 시간, 파일명, PID, 시작 알림 출력 및 LINE 알림 전송"""
     global st_time
     st_time = time()
     print("""
@@ -144,11 +138,13 @@ def start(fname):
     return
 
 def reset_time():
+    """타이머 리셋"""
     global st_time
     st_time = time()
     return
 
 def end(fname):
+    """실행 종료 시 시간, 파일명, 종료 알림 출력 및 LINE 알림 전송"""
     print("""
 #==============================================================================
 # SUCCESS !!! {}
@@ -159,17 +155,21 @@ def end(fname):
     return
 
 def elapsed_minute():
+    """시작 이후 경과 시간(분) 반환"""
     return (time() - st_time)/60
 
 
 def mkdir_p(path):
+    """디렉토리 없으면 생성"""
     try:
         os.stat(path)
     except:
         os.mkdir(path)
 
+# DataFrame을 feather 파일로 컬럼별로 저장
+# 파일명: {path}_{컬럼명}.f
+# 컬럼명에 /, 공백 등은 -로 치환
 def to_feature(df, path):
-    
     if df.columns.duplicated().sum()>0:
         raise Exception(f'duplicated!: { df.columns[df.columns.duplicated()] }')
     df.reset_index(inplace=True, drop=True)
@@ -178,29 +178,24 @@ def to_feature(df, path):
         df[[c]].to_feather(f'{path}_{c}.f')
     return
 
+# DataFrame을 여러 개의 pickle 파일로 분할 저장
 def to_pickles(df, path, split_size=3, inplace=True):
     """
-    path = '../output/mydf'
-    
-    wirte '../output/mydf/0.p'
-          '../output/mydf/1.p'
-          '../output/mydf/2.p'
-    
+    DataFrame을 split_size만큼 분할하여 path/0.p, path/1.p ... 형태로 저장
     """
     print(f'shape: {df.shape}')
-    
     if inplace==True:
         df.reset_index(drop=True, inplace=True)
     else:
         df = df.reset_index(drop=True)
     gc.collect()
     mkdir_p(path)
-    
     kf = KFold(n_splits=split_size)
     for i, (train_index, val_index) in enumerate(tqdm(kf.split(df))):
         df.iloc[val_index].to_pickle(f'{path}/{i:03d}.p')
     return
 
+# 여러 pickle 파일을 concat하여 DataFrame으로 읽기
 def read_pickles(path, col=None, use_tqdm=True):
     if col is None:
         if use_tqdm:
@@ -212,54 +207,29 @@ def read_pickles(path, col=None, use_tqdm=True):
         df = pd.concat([ pd.read_pickle(f)[col] for f in tqdm(sorted(glob(path+'/*'))) ])
     return df
 
-#def to_feathers(df, path, split_size=3, inplace=True):
-#    """
-#    path = '../output/mydf'
-#    
-#    wirte '../output/mydf/0.f'
-#          '../output/mydf/1.f'
-#          '../output/mydf/2.f'
-#    
-#    """
-#    if inplace==True:
-#        df.reset_index(drop=True, inplace=True)
-#    else:
-#        df = df.reset_index(drop=True)
-#    gc.collect()
-#    mkdir_p(path)
-#    
-#    kf = KFold(n_splits=split_size)
-#    for i, (train_index, val_index) in enumerate(tqdm(kf.split(df))):
-#        df.iloc[val_index].to_feather(f'{path}/{i:03d}.f')
-#    return
-#
-#def read_feathers(path, col=None):
-#    if col is None:
-#        df = pd.concat([pd.read_feather(f) for f in tqdm(sorted(glob(path+'/*')))])
-#    else:
-#        df = pd.concat([pd.read_feather(f)[col] for f in tqdm(sorted(glob(path+'/*')))])
-#    return df
-
+# 학습 데이터 로드 (pickle)
 def load_train(col=None):
     if col is None:
         return read_pickles('../data/train')
     else:
         return read_pickles('../data/train', col)
 
+# 테스트 데이터 로드 (pickle)
 def load_test(col=None):
     if col is None:
         return read_pickles('../data/test')
     else:
         return read_pickles('../data/test', col)
 
+# SK_ID_CURR 기준으로 외부 데이터 병합
 def merge(df, col):
     trte = pd.concat([load_train(col=col), #.drop('TARGET', axis=1), 
                       load_test(col=col)])
     df_ = pd.merge(df, trte, on='SK_ID_CURR', how='left')
     return df_
 
+# feature 폴더 내 train/test 피처 쌍이 모두 존재하는지 체크
 def check_feature():
-    
     sw = False
     files = sorted(glob('../feature/train*.f'))
     for f in files:
@@ -267,26 +237,19 @@ def check_feature():
         if not os.path.isfile(path):
             print(f)
             sw = True
-    
     files = sorted(glob('../feature/test*.f'))
     for f in files:
         path = f.replace('test_', 'train_')
         if not os.path.isfile(path):
             print(f)
             sw = True
-    
     if sw:
         raise Exception('Miising file :(')
     else:
         print('All files exist :)')
 
-# =============================================================================
-# 
-# =============================================================================
+# 범주형 변수 one-hot 인코딩 (binary는 drop_first)
 def get_dummies(df):
-    """
-    binary would be drop_first
-    """
     col = df.select_dtypes('O').columns.tolist()
     nunique = df[col].nunique()
     col_binary = nunique[nunique==2].index.tolist()
@@ -296,7 +259,7 @@ def get_dummies(df):
     df.columns = [c.replace(' ', '-') for c in df.columns]
     return df
 
-
+# 메모리 사용량 절감용 다운캐스팅 함수
 def reduce_mem_usage(df):
     col_int8 = []
     col_int16 = []
@@ -308,14 +271,12 @@ def reduce_mem_usage(df):
     col_cat = []
     for c in tqdm(df.columns, mininterval=20):
         col_type = df[c].dtype
-
         if col_type != object:
             c_min = df[c].min()
             c_max = df[c].max()
             if str(col_type)[:3] == 'int':
                 if c_min > np.iinfo(np.int8).min and c_max < np.iinfo(np.int8).max:
                     col_int8.append(c)
-                    
                 elif c_min > np.iinfo(np.int16).min and c_max < np.iinfo(np.int16).max:
                     col_int16.append(c)
                 elif c_min > np.iinfo(np.int32).min and c_max < np.iinfo(np.int32).max:
@@ -331,7 +292,6 @@ def reduce_mem_usage(df):
                     col_float64.append(c)
         else:
             col_cat.append(c)
-    
     if len(col_int8)>0:
         df[col_int8] = df[col_int8].astype(np.int8)
     if len(col_int16)>0:
@@ -349,29 +309,29 @@ def reduce_mem_usage(df):
     if len(col_cat)>0:
         df[col_cat] = df[col_cat].astype('category')
 
-
+# DataFrame을 pkl로 저장 후 gzip 압축
 def to_pkl_gzip(df, path):
     df.to_pickle(path)
     os.system('gzip ' + path)
     os.system('rm ' + path)
     return
 
+# 분산이 0 이하인 컬럼 탐색(제거용)
 def check_var(df, var_limit=0, sample_size=None):
     if sample_size is not None:
         if df.shape[0]>sample_size:
             df_ = df.sample(sample_size, random_state=71)
         else:
             df_ = df
-#            raise Exception(f'df:{df.shape[0]} <= sample_size:{sample_size}')
     else:
         df_ = df
-        
     var = df_.var()
     col_var0 = var[var<=var_limit].index
     if len(col_var0)>0:
         print(f'remove var<={var_limit}: {col_var0}')
     return col_var0
 
+# 상관계수 절대값이 1 이상인 컬럼 탐색(제거용)
 def check_corr(df, corr_limit=1, sample_size=None):
     if sample_size is not None:
         if df.shape[0]>sample_size:
@@ -380,19 +340,18 @@ def check_corr(df, corr_limit=1, sample_size=None):
             raise Exception(f'df:{df.shape[0]} <= sample_size:{sample_size}')
     else:
         df_ = df
-    
     corr = df_.corr('pearson').abs() # pearson or spearman
     a, b = np.where(corr>=corr_limit)
     col_corr1 = []
     for a_,b_ in zip(a, b):
         if a_ != b_ and a_ not in col_corr1:
-#            print(a_, b_)
             col_corr1.append(b_)
     if len(col_corr1)>0:
         col_corr1 = df.iloc[:,col_corr1].columns
         print(f'remove corr>={corr_limit}: {col_corr1}')
     return col_corr1
 
+# 분산/상관계수 기준으로 피처 제거
 def remove_feature(df, var_limit=0, corr_limit=1, sample_size=None, only_var=True):
     col_var0 = check_var(df,  var_limit=var_limit, sample_size=sample_size)
     df.drop(col_var0, axis=1, inplace=True)
@@ -401,43 +360,38 @@ def remove_feature(df, var_limit=0, corr_limit=1, sample_size=None, only_var=Tru
         df.drop(col_corr1, axis=1, inplace=True)
     return
 
+# 사용하지 않는 피처 파일 리스트 반환(미구현)
 def __get_use_files__():
-    
     return
 
+# feature 폴더에서 사용할 피처 파일 리스트 반환(제외 파일, prefix 등 옵션)
 def get_use_files(prefixes=[], is_train=True):
-    
     unused_files  = [f.split('/')[-1] for f in sorted(glob('../feature_unused/*.f'))]
     unused_files += [f.split('/')[-1] for f in sorted(glob('../feature_var0/*.f'))]
     unused_files += [f.split('/')[-1] for f in sorted(glob('../feature_corr1/*.f'))]
-    
     if is_train:
         all_files = sorted(glob('../feature/train*.f'))
         unused_files = ['../feature/train_'+f for f in unused_files]
     else:
         all_files = sorted(glob('../feature/test*.f'))
         unused_files = ['../feature/test_'+f for f in unused_files]
-    
     if len(prefixes)>0:
         use_files = []
         for prefix in prefixes:
             use_files += glob(f'../feature/*{prefix}*')
         all_files = (set(all_files) & set(use_files)) - set(unused_files)
-        
     else:
         for f in unused_files:
             if f in all_files:
                 all_files.remove(f)
-    
     all_files = sorted(all_files)
-    
     print(f'got {len(all_files)}')
     return all_files
 
-
 # =============================================================================
-# other API
+# 기타 API 함수
 # =============================================================================
+# Kaggle API를 통한 제출 및 결과 알림
 def submit(file_path, comment='from API'):
     os.system(f'kaggle competitions submit -c {COMPETITION_NAME} -f {file_path} -m "{comment}"')
     sleep(60) # tekito~~~~
@@ -446,22 +400,20 @@ def submit(file_path, comment='from API'):
     message = 'SCORE!!!\n'
     for i,j in zip(col.split(','), values.split(',')):
         message += f'{i}: {j}\n'
-#        print(f'{i}: {j}') # TODO: comment out later?
     send_line(message.rstrip())
 
-import requests
+# LINE Notify로 메시지 전송
 def send_line(message):
-    
     line_notify_token = '5p5sPTY7PrQaB8Wnwp6aadfiqC8m2zh6Q8llrfNisGT'
     line_notify_api = 'https://notify-api.line.me/api/notify'
-    
     payload = {'message': message}
     headers = {'Authorization': 'Bearer ' + line_notify_token}
     requests.post(line_notify_api, data=payload, headers=headers)
 
+# GCP 인스턴스 중지 명령(알림 포함)
 def stop_instance():
     """
-    You need to login first.
+    GCP 인스턴스 중지 (사전 로그인 필요)
     >> gcloud auth login
     """
     send_line('stop instance')
